@@ -1,6 +1,6 @@
 {
-  "name": "wxt-react-starter",
-  "description": "manifest.json description",
+  "name": "limeade",
+  "description": "LIMEでの日報申請を少しだけ楽にする",
   "private": true,
   "version": "0.0.0",
   "type": "module",

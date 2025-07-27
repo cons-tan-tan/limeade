@@ -14,4 +14,7 @@ export default defineConfig({
       },
     },
   }),
+  manifest: {
+    name: "Limeade",
+  },
 });
