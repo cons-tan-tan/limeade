@@ -14,7 +14,8 @@ export default defineConfig({
       },
     },
   }),
-  manifest: {
+  manifest: () => ({
     name: "Limeade",
-  },
+    key: import.meta.env.WXT_EXTENSION_KEY,
+  }),
 });
