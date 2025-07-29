@@ -17,7 +17,7 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "prepare": "wxt prepare & pnpm lefthook install"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
