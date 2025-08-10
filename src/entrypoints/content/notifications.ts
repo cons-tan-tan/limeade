@@ -2,6 +2,7 @@ interface Observer {
   start(): void;
   stop(): void;
   setTarget(target: Element): Observer;
+  setImmediate(): Observer;
 }
 
 function createObserver(
@@ -13,6 +14,7 @@ function createObserver(
 ): Observer {
   let observer: MutationObserver | null = null;
   let target: Element | null = null;
+  let shouldRunImmediately = false;
 
   const option: MutationObserverInit = {
     subtree: true,
@@ -28,6 +30,11 @@ function createObserver(
           }
         });
         observer.observe(target, option);
+
+        // immediate実行
+        if (shouldRunImmediately) {
+          callback([], observerInstance, target);
+        }
       }
     },
     stop: () => {
@@ -38,6 +45,10 @@ function createObserver(
     },
     setTarget: (newTarget: Element) => {
       target = newTarget;
+      return observerInstance;
+    },
+    setImmediate: () => {
+      shouldRunImmediately = true;
       return observerInstance;
     },
   };
@@ -66,7 +77,7 @@ const notificationContentObserver = createObserver(
       notificationHTML.style.display = "none"; // noneにするといい感じに消える
     }
   },
-);
+).setImmediate();
 
 // 通知コンテナ出現を監視する
 export const notificationPresenceObserver = createObserver(() => {
