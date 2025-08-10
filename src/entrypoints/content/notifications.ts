@@ -1,6 +1,7 @@
 interface Observer {
   start(): void;
   stop(): void;
+  getTarget(): Element;
 }
 
 interface ObserverBuilder {
@@ -11,11 +12,7 @@ interface ObserverBuilder {
 }
 
 function createObserver(
-  callback: (
-    mutations: MutationRecord[],
-    observer: Observer,
-    target: Element,
-  ) => void,
+  callback: (mutations: MutationRecord[], observer: Observer) => void,
   target: Element,
   immediate = false,
   options?: MutationObserverInit,
@@ -30,13 +27,13 @@ function createObserver(
     start: () => {
       if (!mutationObserver) {
         mutationObserver = new MutationObserver((mutations) => {
-          callback(mutations, observer, target);
+          callback(mutations, observer);
         });
         mutationObserver.observe(target, option);
 
         // immediate実行
         if (immediate) {
-          callback([], observer, target);
+          callback([], observer);
         }
       }
     },
@@ -46,17 +43,16 @@ function createObserver(
         mutationObserver = null;
       }
     },
+    getTarget: () => {
+      return target;
+    },
   };
 
   return observer;
 }
 
 function createObserverBuilder(
-  callback: (
-    mutations: MutationRecord[],
-    observer: Observer,
-    target: Element,
-  ) => void,
+  callback: (mutations: MutationRecord[], observer: Observer) => void,
 ): ObserverBuilder {
   let observerTarget: Element | null = null;
   let observerImmediate = false;
@@ -92,45 +88,43 @@ function createObserverBuilder(
 }
 
 const filter = "Backlog*";
+const regexp = new RegExp(filter);
 
 // 既に監視されているコンテナを管理するWeakSet
 const observedContainers = new WeakSet<Element>();
 
 // 通知内容を監視するBuilder
-const notificationContentBuilder = createObserverBuilder(
-  (_mutations, _observer, target) => {
-    if (!filter) return;
-    const regexp = new RegExp(filter);
-
-    for (const notification of target.children) {
-      const notificationHTML = notification as HTMLElement;
-      if (notificationHTML.style.display === "none") continue;
-      const notificationText = notificationHTML.querySelector(
-        "#notistack-snackbar",
-      )?.textContent as string;
-      if (!regexp.test(notificationText)) continue;
-      // noneにするといい感じに消える
-      notificationHTML.style.display = "none";
-    }
-  },
-).setImmediate();
+const notificationContentBuilder = createObserverBuilder((_, observer) => {
+  for (const notification of observer.getTarget().children) {
+    if (!(notification instanceof HTMLElement)) continue;
+    // 既に消したものは除外
+    if (notification.style.display === "none") continue;
+    const text = notification.innerText;
+    // フィルターにマッチしなければスキップ
+    if (!regexp.test(text)) continue;
+    // noneにすると表示上の齟齬無く消せる
+    // 要素自体を削除するとエラーが起こる
+    notification.style.display = "none";
+  }
+}).setImmediate();
 
 // 通知コンテナ出現を監視する
-export const notificationPresenceObserver = createObserverBuilder(() => {
-  const containers = document.getElementsByClassName(
-    "notistack-SnackbarContainer",
-  );
-
-  for (const container of containers) {
-    // 既に監視されている場合はスキップ
-    if (observedContainers.has(container)) continue;
-
-    // WeakSetに追加して重複を防ぐ
-    observedContainers.add(container);
-
-    // コンテナ内容監視を開始
-    notificationContentBuilder.setTarget(container).build().start();
-  }
-})
+export const notificationPresenceObserver = createObserverBuilder(
+  (mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        // 通知コンテナに限定
+        if (!node.classList.contains("notistack-SnackbarContainer")) continue;
+        // 既に監視中であればスキップ
+        if (observedContainers.has(node)) continue;
+        // WeakSetに追加して重複を防ぐ
+        observedContainers.add(node);
+        // コンテナ内容監視を開始
+        notificationContentBuilder.setTarget(node).build().start();
+      }
+    }
+  },
+)
   .setTarget(document.body)
   .build();
