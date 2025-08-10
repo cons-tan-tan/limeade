@@ -6,6 +6,7 @@ interface Observer {
 interface ObserverBuilder {
   setTarget(target: Element): ObserverBuilder;
   setImmediate(): ObserverBuilder;
+  setOptions(options: MutationObserverInit): ObserverBuilder;
   build(): Observer;
 }
 
@@ -17,37 +18,37 @@ function createObserver(
   ) => void,
   target: Element,
   immediate = false,
+  options?: MutationObserverInit,
 ): Observer {
-  let observer: MutationObserver | null = null;
+  let mutationObserver: MutationObserver | null = null;
 
-  const option: MutationObserverInit = {
-    subtree: true,
+  const option: MutationObserverInit = options || {
     childList: true,
   };
 
-  const observerInstance: Observer = {
+  const observer: Observer = {
     start: () => {
-      if (!observer) {
-        observer = new MutationObserver((mutations) => {
-          callback(mutations, observerInstance, target);
+      if (!mutationObserver) {
+        mutationObserver = new MutationObserver((mutations) => {
+          callback(mutations, observer, target);
         });
-        observer.observe(target, option);
+        mutationObserver.observe(target, option);
 
         // immediate実行
         if (immediate) {
-          callback([], observerInstance, target);
+          callback([], observer, target);
         }
       }
     },
     stop: () => {
-      if (observer) {
-        observer.disconnect();
-        observer = null;
+      if (mutationObserver) {
+        mutationObserver.disconnect();
+        mutationObserver = null;
       }
     },
   };
 
-  return observerInstance;
+  return observer;
 }
 
 function createObserverBuilder(
@@ -57,23 +58,33 @@ function createObserverBuilder(
     target: Element,
   ) => void,
 ): ObserverBuilder {
-  let builderTarget: Element | null = null;
-  let builderImmediate = false;
+  let observerTarget: Element | null = null;
+  let observerImmediate = false;
+  let observerOptions: MutationObserverInit | undefined;
 
   const builderInstance: ObserverBuilder = {
     setTarget: (target: Element) => {
-      builderTarget = target;
+      observerTarget = target;
       return builderInstance;
     },
     setImmediate: () => {
-      builderImmediate = true;
+      observerImmediate = true;
+      return builderInstance;
+    },
+    setOptions: (options: MutationObserverInit) => {
+      observerOptions = options;
       return builderInstance;
     },
     build: () => {
-      if (!builderTarget) {
+      if (!observerTarget) {
         throw new Error("Target is required. Use setTarget() before build().");
       }
-      return createObserver(callback, builderTarget, builderImmediate);
+      return createObserver(
+        callback,
+        observerTarget,
+        observerImmediate,
+        observerOptions,
+      );
     },
   };
 
@@ -105,7 +116,7 @@ const notificationContentBuilder = createObserverBuilder(
 ).setImmediate();
 
 // 通知コンテナ出現を監視する
-export const notificationPresenceObserver = createObserver(() => {
+export const notificationPresenceObserver = createObserverBuilder(() => {
   const containers = document.getElementsByClassName(
     "notistack-SnackbarContainer",
   );
@@ -120,4 +131,6 @@ export const notificationPresenceObserver = createObserver(() => {
     // コンテナ内容監視を開始
     notificationContentBuilder.setTarget(container).build().start();
   }
-}, document.body);
+})
+  .setTarget(document.body)
+  .build();
