@@ -1,8 +1,12 @@
 interface Observer {
   start(): void;
   stop(): void;
-  setTarget(target: Element): Observer;
-  setImmediate(): Observer;
+}
+
+interface ObserverBuilder {
+  setTarget(target: Element): ObserverBuilder;
+  setImmediate(): ObserverBuilder;
+  build(): Observer;
 }
 
 function createObserver(
@@ -11,10 +15,10 @@ function createObserver(
     observer: Observer,
     target: Element,
   ) => void,
+  target: Element,
+  immediate = false,
 ): Observer {
   let observer: MutationObserver | null = null;
-  let target: Element | null = null;
-  let shouldRunImmediately = false;
 
   const option: MutationObserverInit = {
     subtree: true,
@@ -23,16 +27,14 @@ function createObserver(
 
   const observerInstance: Observer = {
     start: () => {
-      if (!observer && target) {
+      if (!observer) {
         observer = new MutationObserver((mutations) => {
-          if (target) {
-            callback(mutations, observerInstance, target);
-          }
+          callback(mutations, observerInstance, target);
         });
         observer.observe(target, option);
 
         // immediate実行
-        if (shouldRunImmediately) {
+        if (immediate) {
           callback([], observerInstance, target);
         }
       }
@@ -43,17 +45,39 @@ function createObserver(
         observer = null;
       }
     },
-    setTarget: (newTarget: Element) => {
-      target = newTarget;
-      return observerInstance;
-    },
-    setImmediate: () => {
-      shouldRunImmediately = true;
-      return observerInstance;
-    },
   };
 
   return observerInstance;
+}
+
+function createObserverBuilder(
+  callback: (
+    mutations: MutationRecord[],
+    observer: Observer,
+    target: Element,
+  ) => void,
+): ObserverBuilder {
+  let builderTarget: Element | null = null;
+  let builderImmediate = false;
+
+  const builderInstance: ObserverBuilder = {
+    setTarget: (target: Element) => {
+      builderTarget = target;
+      return builderInstance;
+    },
+    setImmediate: () => {
+      builderImmediate = true;
+      return builderInstance;
+    },
+    build: () => {
+      if (!builderTarget) {
+        throw new Error("Target is required. Use setTarget() before build().");
+      }
+      return createObserver(callback, builderTarget, builderImmediate);
+    },
+  };
+
+  return builderInstance;
 }
 
 const filter = "Backlog*";
@@ -61,8 +85,8 @@ const filter = "Backlog*";
 // 既に監視されているコンテナを管理するWeakSet
 const observedContainers = new WeakSet<Element>();
 
-// 通知内容を監視する
-const notificationContentObserver = createObserver(
+// 通知内容を監視するBuilder
+const notificationContentBuilder = createObserverBuilder(
   (_mutations, _observer, target) => {
     if (!filter) return;
     const regexp = new RegExp(filter);
@@ -74,7 +98,8 @@ const notificationContentObserver = createObserver(
         "#notistack-snackbar",
       )?.textContent as string;
       if (!regexp.test(notificationText)) continue;
-      notificationHTML.style.display = "none"; // noneにするといい感じに消える
+      // noneにするといい感じに消える
+      notificationHTML.style.display = "none";
     }
   },
 ).setImmediate();
@@ -93,6 +118,6 @@ export const notificationPresenceObserver = createObserver(() => {
     observedContainers.add(container);
 
     // コンテナ内容監視を開始
-    notificationContentObserver.setTarget(container).start();
+    notificationContentBuilder.setTarget(container).build().start();
   }
-}).setTarget(document.body);
+}, document.body);
