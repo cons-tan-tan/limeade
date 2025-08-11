@@ -17,6 +17,7 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
+    "check": "pnpm biome check --write & tsc --noEmit",
     "prepare": "wxt prepare & pnpm lefthook install"
   },
   "dependencies": {
