@@ -21,6 +21,7 @@
     "prepare": "wxt prepare & pnpm lefthook install"
   },
   "dependencies": {
+    "@marcbachmann/cel-js": "^1.0.5",
     "@tailwindcss/vite": "^4.1.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
