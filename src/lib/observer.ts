@@ -1,88 +1,89 @@
-export interface Observer {
+type ImmediateSchedule = "sync" | "microtask" | "raf";
+
+export interface Observer<T extends Element = Element> {
   start(): void;
   stop(): void;
-  getTarget(): Element;
+  dispose(): void;
+  readonly target: T;
+  readonly isRunning: boolean;
 }
 
-export interface ObserverBuilder {
-  setTarget(target: Element): ObserverBuilder;
-  setImmediate(): ObserverBuilder;
-  setOptions(options: MutationObserverInit): ObserverBuilder;
-  build(): Observer;
+export interface CreateObserverOptions<T extends Element> {
+  target: T;
+  options?: MutationObserverInit;
+  immediate?: boolean;
+  schedule?: ImmediateSchedule;
+  signal?: AbortSignal;
 }
 
-function createObserver(
-  callback: (mutations: MutationRecord[], observer: Observer) => void,
-  target: Element,
-  immediate = false,
-  options?: MutationObserverInit,
-): Observer {
-  let mutationObserver: MutationObserver | null = null;
+export function createObserver<T extends Element>(
+  callback: (mutations: MutationRecord[], obs: Observer<T>) => void,
+  cfg: CreateObserverOptions<T>,
+): Observer<T> {
+  const {
+    target,
+    immediate = false,
+    schedule = "microtask",
+    signal,
+    options,
+  } = cfg;
 
-  const option: MutationObserverInit = options || {
-    childList: true,
+  // デフォルトをマージ（明示オプションで上書き）
+  const opts: MutationObserverInit = { childList: true, ...options };
+
+  let mo: MutationObserver | null = null;
+  let running = false;
+
+  const runImmediate = () => {
+    const fire = () => callback([], api);
+    switch (schedule) {
+      case "microtask":
+        queueMicrotask(fire);
+        break;
+      case "raf":
+        requestAnimationFrame(() => fire());
+        break;
+      default:
+        fire();
+    }
   };
 
-  const observer: Observer = {
-    start: () => {
-      if (!mutationObserver) {
-        mutationObserver = new MutationObserver((mutations) => {
-          callback(mutations, observer);
-        });
-        mutationObserver.observe(target, option);
+  const start = () => {
+    if (running) return;
+    mo = new MutationObserver((mutations) => callback(mutations, api));
+    mo.observe(target, opts);
+    running = true;
 
-        // immediate実行
-        if (immediate) {
-          callback([], observer);
-        }
+    if (signal) {
+      if (signal.aborted) {
+        stop();
+        return;
       }
-    },
-    stop: () => {
-      if (mutationObserver) {
-        mutationObserver.disconnect();
-        mutationObserver = null;
-      }
-    },
-    getTarget: () => {
+      // 一度だけstopを紐づける
+      signal.addEventListener("abort", stop, { once: true });
+    }
+
+    if (immediate) runImmediate();
+  };
+
+  const stop = () => {
+    if (!running) return;
+    mo?.disconnect();
+    mo = null;
+    running = false;
+  };
+
+  const api: Observer<T> = {
+    start,
+    stop,
+    dispose: stop,
+    get target() {
       return target;
     },
-  };
-
-  return observer;
-}
-
-export function createObserverBuilder(
-  callback: (mutations: MutationRecord[], observer: Observer) => void,
-): ObserverBuilder {
-  let observerTarget: Element | null = null;
-  let observerImmediate = false;
-  let observerOptions: MutationObserverInit | undefined;
-
-  const builderInstance: ObserverBuilder = {
-    setTarget: (target: Element) => {
-      observerTarget = target;
-      return builderInstance;
-    },
-    setImmediate: () => {
-      observerImmediate = true;
-      return builderInstance;
-    },
-    setOptions: (options: MutationObserverInit) => {
-      observerOptions = options;
-      return builderInstance;
-    },
-    build: () => {
-      if (!observerTarget) {
-        throw new Error("Target is required. Use setTarget() before build().");
-      }
-      return createObserver(
-        callback,
-        observerTarget,
-        observerImmediate,
-        observerOptions,
-      );
+    get isRunning() {
+      return running;
     },
   };
 
-  return builderInstance;
+  return Object.freeze(api);
 }
