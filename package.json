@@ -2,7 +2,7 @@
   "name": "limeade",
   "description": "LIMEでの日報申請を少しだけ楽にする",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "packageManager": "pnpm@10.13.1",
   "engines": {
