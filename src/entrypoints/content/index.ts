@@ -1,4 +1,4 @@
-import { notificationPresenceObserver } from "@/entrypoints/content/notifications.ts";
+import { notificationPresenceObserver } from "@/entrypoints/content/notifications";
 
 export default defineContentScript({
   matches: ["https://www.it.toshin-correction.com/*"],

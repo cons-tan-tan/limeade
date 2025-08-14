@@ -1,5 +1,5 @@
 import { parse } from "@marcbachmann/cel-js";
-import { createObserver } from "@/lib/observer.ts";
+import { createObserver } from "@/lib/observer";
 
 // https://notistack.com/features/customization を参照
 const NOTIFICATION_TYPES = [
