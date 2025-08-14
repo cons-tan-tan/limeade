@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create release
         if: github.event_name != 'workflow_dispatch'
-        run: gh release create ${{github.ref_name}} --draft=true --generate-notes
+        run: gh release create ${{ github.ref_name }} --draft=true --generate-notes
 
   build-and-upload:
     needs: create-release
